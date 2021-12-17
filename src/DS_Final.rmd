@@ -1,0 +1,234 @@
+---
+title: "The Spread of Facebook Misinformation"
+author: Samantha Lee
+date: "16 December 2021"
+output: html_document
+---
+
+Final project report for Rutgers University 01:790:391 - Data Science for Political Science
+
+## Abstract
+
+Social media serve as primary sources of news for many people, and researchers study them to examine political literacy, polarization, and the factors that contribute to the spread of misinformation. Evidence suggests that eye-catching posts create bias in favor of fake news, clickbait, and graphics, and that conservative people demonstrate high amounts of in-group bias. A dataset of Facebook posts shows that the distribution of activity leans toward articles that are false, conservative, or visual.
+
+## Background
+
+Misinformation has the power to create contention, influence public opinion, undermine democracy, and uplift malicious or ignorant parties. Its recent momentum has given reason to investigate the quality and correlations of news on popular sites like Facebook.
+
+Previous research suggests:
+
+- News sources report falsehoods to increase engagement ([Zannettou et al., 2019](https://dl.acm.org/doi/abs/10.1145/3309699)).
+- Conservatives more frequently conform to in-group beliefs, even if they are false ([Jost et al., 2018](https://www.sciencedirect.com/science/article/pii/S2352250X17302828)).
+- Graphics add visual bias to media and can signal importance ([Grabe and Bucy, 2009](https://oxford.universitypressscholarship.com/view/10.1093/acprof:oso/9780195372076.001.0001/acprof-9780195372076-chapter-5)).
+
+### What factors correlate to the spread of misinformation?
+
+Objective: Considering background information, the following relationships can reveal the qualities of misinformation and its momentum:
+
+- Activity vs. truth by partisanship 
+- Activity vs. truth by media type
+
+## Data and Methods
+
+[BuzzFeed News (2016)](https://www.buzzfeednews.com/article/craigsilverman/partisan-fb-pages-analysis#.ia1QB2KJl) collected posts from a variety of political Facebook pages during the 2016 US presidential election. 
+The dataset has 2282 rows and 14 columns.
+
+- ‘Category’ indicates partisanship: liberal (left), nonpartisan (mainstream), and conservative (right).
+- ‘Post.Type’ indicates the medium of the post: link, photo, text, or video.
+- ‘Rating’ indicates the truthfulness of the content: mostly true (3), a mixture of true and false (2), mostly false (1), and no factual content (0). 
+- ‘share_count’, ‘reaction_count’, and ‘comment_count’ measure activity.
+
+```{r setup, include=FALSE}
+library(ggplot2)
+library(plotly)
+library(knitr)
+```
+
+```{r load, include=FALSE}
+# Set working directory
+setwd("~/R")
+# Load data
+fbdata <- read.csv("data/facebook-fact-check.csv")
+```
+
+```{r fbdata}
+fbdata$activity_count = fbdata$share_count + fbdata$reaction_count + fbdata$comment_count
+fbdata$Rating_num = ifelse(fbdata$Rating == "mostly true", 3,
+                           ifelse(fbdata$Rating == "mixture of true and false", 2,
+                                  ifelse(fbdata$Rating == "mostly false", 1, 0)))
+head(fbdata)
+summary(fbdata)
+```
+
+A scatter plot can reveal correlations between truth and activity to determine if the quality of truthfulness itself is associated with spread. 
+
+- Dependent variable: activity (measured as the sum of shares, reactions, and comments)
+- Independent variable: truth rating
+- Confounding variables: partisanship, media
+
+Subsetting data and observing mean and median truth ratings and activity by partisanship and media can additionally reveal how the other factors may act as confounding variables.
+
+Note: a scatter plot can handle the wide range of activity values; a regression would not translate into a constructive visual.
+
+```{r subsets}
+liberal <- subset(fbdata, Category == "left")
+conservative <- subset(fbdata, Category == "right")
+nonpartisan <- subset(fbdata, Category == "mainstream")
+
+link <- subset(fbdata, Post.Type == "link")
+photo <- subset(fbdata, Post.Type == "photo")
+text <- subset(fbdata, Post.Type == "text")
+video <- subset(fbdata, Post.Type == "video")
+
+mostly_true <- subset(fbdata, Rating_num == "3")
+mixture <- subset(fbdata, Rating_num == "2")
+mostly_false <- subset(fbdata, Rating_num == "1")
+completely_false <- subset(fbdata, Rating_num == "0")
+```
+## Results
+
+```{r main,fig.align = 'center'}
+p <- ggplot(data=fbdata, mapping = aes(x=Rating, y=activity_count, color=Category)) +
+  geom_point(na.rm = T, size = 3, shape = 4, alpha = .5, position = "jitter")+
+  scale_x_discrete(limits = c("no factual content", "mostly false", 
+                              "mixture of true and false","mostly true"),
+                   labels = c("No Factual \nContent", "Mostly False", 
+                              "Mixture of True \nand False","Mostly True"))+
+  ggtitle("The Spread of Facebook Misinformation")+
+  ylab("Sum of Shares, Comments, and Reactions")+
+  xlab("Truth Rating")+
+  ylim(0, 150000)+
+  scale_color_manual(name = "Partisanship",
+                     values=c('blue','black', 'red'),
+                     limits = c("left","mainstream","right"),
+                     labels = c("Liberal", "Nonpartisan", "Conservative"))+
+  theme_bw()+
+  theme(legend.position="bottom")+
+  theme(plot.margin=unit(c(1,1,.5,1),"cm"))+
+  theme(axis.title.x = element_text(margin = margin(t = 20)))+
+  theme(axis.title.y = element_text(margin = margin(r = 20)))
+
+ggplotly(p)
+```
+
+Low truth ratings correlate most to high activity.
+
+- Mean, median for mostly false: (10014, 4006)
+- Mean. median for no factual information: (42771, 3116) 
+
+```{r liberal, echo=FALSE,fig.align = 'center'}
+l <- ggplot(data=liberal, mapping = aes(x=Rating, y=activity_count, shape=Post.Type)) +
+  geom_point(na.rm=T, size=3, alpha = .5,color="blue",position = "jitter")+
+  scale_x_discrete(limits = c("no factual content", "mostly false", "mixture of true and false","mostly true"),
+                   labels = c("No Factual \nContent", "Mostly False", "Mixture of True \nand False","Mostly True"))+
+  ggtitle("The Spread of Facebook Misinformation - Liberal Media")+
+  ylab("Sum of Shares, Comments, and Reactions")+
+  xlab("Truth Rating")+
+  ylim(0, 150000)+
+  scale_shape_manual(name = "Media Type",
+                     values=c(4, 1, 0, 6),
+                     limits = c("photo","video","link","text"),
+                     labels = c("Photo", "Video","Link","Text"))+
+  theme_bw()+
+  theme(legend.position="bottom")+
+  theme(plot.margin=unit(c(1,1,.5,1),"cm"))+
+  theme(axis.title.x = element_text(margin = margin(t = 20)))+
+  theme(axis.title.y = element_text(margin = margin(r = 20)))
+
+ggplotly(l)
+```
+
+Liberal content yields higher activity overall. Truth amongst liberal sources is generally dispersed, but most content is mostly true.
+
+
+```{r cons, echo = FALSE,fig.align = 'center'}
+c <- ggplot(data=conservative, mapping = aes(x=Rating, y=activity_count, shape=Post.Type)) +
+  geom_point(na.rm=T, size=3, alpha = .5,color="red",position = "jitter")+
+  scale_x_discrete(limits = c("no factual content", "mostly false", "mixture of true and false","mostly true"),
+                   labels = c("No Factual \nContent", "Mostly False", "Mixture of True \nand False","Mostly True"))+
+  ggtitle("The Spread of Facebook Misinformation - Conservative Media")+
+  ylab("Sum of Shares, Comments, and Reactions")+
+  xlab("Truth Rating")+
+  ylim(0, 150000)+
+  scale_shape_manual(name = "Media Type",
+                     values=c(4, 1, 0, 6),
+                     limits = c("photo","video","link","text"),
+                     labels = c("Photo", "Video","Link","Text"))+
+  theme_bw()+
+  theme(legend.position="bottom")+
+  theme(plot.margin=unit(c(1,1,.5,1),"cm"))+
+  theme(axis.title.x = element_text(margin = margin(t = 20)))+
+  theme(axis.title.y = element_text(margin = margin(r = 20)))
+
+ggplotly(c)
+```
+
+Truth amongst conservative sources is the most dispersed.
+
+```{r np, echo = FALSE,fig.align = 'center'}
+m <- ggplot(data=nonpartisan, mapping = aes(x=Rating, y=activity_count, shape=Post.Type)) +
+  geom_point(na.rm=T, size=3, alpha = .4,color="black",position = "jitter")+
+  scale_x_discrete(limits = c("no factual content", "mostly false", "mixture of true and false","mostly true"),
+                   labels = c("No Factual \nContent", "Mostly False", "Mixture of True \nand False","Mostly True"))+
+  ggtitle("The Spread of Facebook Misinformation - Nonpartisan Media")+
+  ylab("Sum of Shares, Comments, and Reactions")+
+  xlab("Truth Rating")+
+  ylim(0, 10000)+
+  scale_shape_manual(name = "Media Type",
+                     values=c(4, 1, 0, 6),
+                     limits = c("photo","video","link","text"),
+                     labels = c("Photo", "Video","Link","Text"))+
+  theme_bw()+
+  theme(legend.position="bottom")+
+  theme(plot.margin=unit(c(1,1,.5,1),"cm"))+
+  theme(axis.title.x = element_text(margin = margin(t = 20)))+
+  theme(axis.title.y = element_text(margin = margin(r = 20)))
+
+ggplotly(m)
+```
+
+Nonpartisan content is rarely false. 
+
+### Overall... 
+High activity correlates most to…
+
+- Liberal partisanship (mean = 42287, median = 16380)
+- Photos (mean = 42614, median = 23820)
+
+Low truth ratings correlate most to…
+
+- Conservative partisanship (mean = 2.068, median = 2)
+- Liberal partisanship (mean = 2.023, median = 3)
+- Photos (mean = 1.014, median = 0)
+
+## Data Summaries
+
+To further assess these relationships, I invite you to examine the data summaries from each subset:
+
+```{r summaries}
+summary(liberal)
+summary(conservative)
+summary(nonpartisan)
+summary(link)
+summary(photo)
+summary(text)
+summary(video)
+summary(mostly_true)
+summary(mixture)
+summary(mostly_false)
+summary(completely_false)
+```
+
+## Conclusion
+
+Facebook data shows that falsehood itself corresponds to high user engagement, supporting prior research. Visual forms of news additionally garner more attention, as do liberal sources. Generally, partisans are more heavily associated with fake news than nonpartisans. These findings can help experts predict and mitigate the spread of misinformation. More research can be done to further explore the four-dimensional relationship between truth, activity, partisanship, and media and determine causation rather than mere correlation.
+
+## Works Cited
+
+Jost, J. T., van der Linden, S., Panagopoulos, C., & Hardin, C. D. (2018). Ideological asymmetries in conformity, desire for shared reality, and the spread of misinformation. Current Opinion in Psychology, 23, 77–83. https://doi.org/10.1016/j.copsyc.2018.01.003
+
+Grabe, M. E., & Bucy, E. P. (2009). Visual Bias. In Image Bite Politics. Oxford University Press. https://doi.org/10.1093/acprof:oso/9780195372076.003.0005
+
+Silverman, Craig. *Hyperpartisan Facebook Pages Are Publishing False And Misleading Information At An Alarming Rate.* (2016). BuzzFeed News. Retrieved December 16, 2021, from https://www.buzzfeednews.com/article/craigsilverman/partisan-fb-pages-analysis
+
+Zannettou, S., Sirivianos, M., Blackburn, J., & Kourtellis, N. (2019). The Web of False Information: Rumors, Fake News, Hoaxes, Clickbait, and Various Other Shenanigans. Journal of Data and Information Quality, 11(3), 10:1-10:37. https://doi.org/10.1145/3309699
